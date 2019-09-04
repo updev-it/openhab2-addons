@@ -167,8 +167,6 @@ public abstract class PlugwiseHABaseHandler<E, C> extends BaseThingHandler {
     /**
      * Checks the configuration for validity, result is reflected in the status of
      * the Thing
-     *
-     * @param configuration The configuration to check
      */
     private boolean checkConfig() {
         if (this.config == null || !this.config.isValid()) {

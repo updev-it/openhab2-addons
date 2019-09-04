@@ -16,6 +16,7 @@ package org.openhab.binding.plugwiseha.internal.handler;
 import static org.eclipse.smarthome.core.thing.ThingStatus.OFFLINE;
 import static org.eclipse.smarthome.core.thing.ThingStatus.ONLINE;
 import static org.eclipse.smarthome.core.thing.ThingStatusDetail.*;
+import static org.openhab.binding.plugwiseha.internal.PlugwiseHABindingConstants.*;
 
 import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
@@ -36,7 +37,6 @@ import org.eclipse.smarthome.core.thing.binding.ThingHandler;
 import org.eclipse.smarthome.core.thing.binding.ThingHandlerCallback;
 import org.eclipse.smarthome.core.thing.binding.builder.ThingStatusInfoBuilder;
 import org.eclipse.smarthome.core.types.Command;
-import static org.openhab.binding.plugwiseha.internal.PlugwiseHABindingConstants.*;
 import org.openhab.binding.plugwiseha.internal.api.exception.PlugwiseHABadRequestException;
 import org.openhab.binding.plugwiseha.internal.api.exception.PlugwiseHACommunicationException;
 import org.openhab.binding.plugwiseha.internal.api.exception.PlugwiseHAException;
@@ -164,8 +164,6 @@ public class PlugwiseHABridgeHandler extends BaseBridgeHandler {
     /**
      * Checks the configuration for validity, result is reflected in the status of
      * the Thing
-     *
-     * @param configuration The configuration to check
      */
     private boolean checkConfig() {
         if (this.config == null || !this.config.isValid()) {

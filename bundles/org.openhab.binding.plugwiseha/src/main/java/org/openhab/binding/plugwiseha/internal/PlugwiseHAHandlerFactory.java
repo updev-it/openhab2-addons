@@ -66,6 +66,13 @@ public class PlugwiseHAHandlerFactory extends BaseThingHandlerFactory {
 
     // Public methods
 
+    /**
+     * Returns whether the handler is able to create a thing or register a thing
+     * handler for the given type.
+     *
+     * @param thingTypeUID the thing type UID
+     * @return true, if the handler supports the thing type, false otherwise
+     */
     @Override
     public boolean supportsThingType(ThingTypeUID thingTypeUID) {
         return (PlugwiseHABridgeHandler.supportsThingType(thingTypeUID)
@@ -73,6 +80,15 @@ public class PlugwiseHAHandlerFactory extends BaseThingHandlerFactory {
                 || PlugwiseHAApplianceHandler.supportsThingType(thingTypeUID);
     }
 
+    /**
+     * Creates a thing for given arguments.
+     *
+     * @param thingTypeUID  thing type uid (not null)
+     * @param configuration configuration
+     * @param thingUID      thing uid, which can be null
+     * @param bridgeUID     bridge uid, which can be null
+     * @return created thing
+     */
     @Override
     public @Nullable Thing createThing(ThingTypeUID thingTypeUID, Configuration configuration,
             @Nullable ThingUID thingUID, @Nullable ThingUID bridgeUID) {
@@ -89,7 +105,13 @@ public class PlugwiseHAHandlerFactory extends BaseThingHandlerFactory {
     }
 
     // Protected and private methods
-
+    
+    /**
+     * Creates a {@link ThingHandler} for the given thing.
+     *
+     * @param thing the thing
+     * @return thing the created handler
+     */
     @Override
     protected @Nullable ThingHandler createHandler(Thing thing) {
         ThingTypeUID thingTypeUID = thing.getThingTypeUID();

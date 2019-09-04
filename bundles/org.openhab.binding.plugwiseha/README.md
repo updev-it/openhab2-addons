@@ -58,10 +58,6 @@ You must define a Plugwise Home Automation gateway (Bridge) before defining zone
 
 ## Channels
 
-_Here you should provide information about available channel types, what their meaning is and how they can be used._
-
-_Note that it is planned to generate some part of this based on the XML files within ```src/main/resources/ESH-INF/thing``` of your binding._
-
 | channel | type   | Read-only?  | description                 |
 | ------- | ------ | ------------ | --------------- |
 | temperature | Number:Temperature | Yes | This channel is used to read the temperature of an appliance that supports the thermostat functionality |
@@ -74,7 +70,7 @@ _Note that it is planned to generate some part of this based on the XML files wi
 
 ## Full Example
 
-things/plugwiseha.things
+**things/plugwiseha.things**
 
 ```
 Bridge plugwiseha:gateway:home "Plugwise Home Automation Gateway" [ smileId="abcdefgh" ] {
@@ -86,7 +82,7 @@ Bridge plugwiseha:gateway:home "Plugwise Home Automation Gateway" [ smileId="abc
 
 Replace `$device_id` accordingly.
 
-items/plugwiseha.items
+**items/plugwiseha.items**
 
 ```
 Number living_room_zone_temperature "Zone temperature" {channel="plugwiseha:zone:home:living_room_zone:temperature"}
@@ -100,14 +96,14 @@ Switch living_room_pump_lock "Floor heating pump lock [MAP:(plugwiseha.map):%s]"
 Number living_room_pump_power_usage "Floor heating pump power [%0.2fW]" {channel="plugwiseha:appliance_pump:home:living_room_pump:powerUsage"}
 ```
 
-transform/plugwiseha.map
+**transform/plugwiseha.map**
 
 ```
 ON=Locked
 OFF=Unlocked
 ```
 
-sitemaps/plugwiseha.sitemap
+**sitemaps/plugwiseha.sitemap**
 
 ```
 sitemap plugwiseha label="PlugwiseHA Binding"
