@@ -181,6 +181,11 @@ public class PlugwiseHAApplianceHandler extends PlugwiseHABaseHandler<Appliance,
 
             if (batteryLevelOptional.isPresent()) {
                 state = new DecimalType(batteryLevel.intValue());
+                if (batteryLevel <= this.config.getLowBatteryPercentage()) {
+                    updateState(APPLIANCE_BATTERYLEVELLOW_CHANNEL, OnOffType.ON);                    
+                } else {
+                    updateState(APPLIANCE_BATTERYLEVELLOW_CHANNEL, OnOffType.OFF);
+                }
             }
             break;
         }
