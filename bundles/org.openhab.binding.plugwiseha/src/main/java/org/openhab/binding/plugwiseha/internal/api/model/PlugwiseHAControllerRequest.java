@@ -13,6 +13,8 @@
 
 package org.openhab.binding.plugwiseha.internal.api.model;
 
+import java.io.StringReader;
+import java.io.StringWriter;
 import java.net.ConnectException;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
@@ -23,6 +25,11 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
+
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.stream.StreamResult;
+import javax.xml.transform.stream.StreamSource;
 
 import com.thoughtworks.xstream.XStream;
 
@@ -45,8 +52,10 @@ import org.eclipse.jetty.util.StringUtil;
 import org.openhab.binding.plugwiseha.internal.api.exception.PlugwiseHABadRequestException;
 import org.openhab.binding.plugwiseha.internal.api.exception.PlugwiseHACommunicationException;
 import org.openhab.binding.plugwiseha.internal.api.exception.PlugwiseHAException;
+import org.openhab.binding.plugwiseha.internal.api.exception.PlugwiseHAForbiddenException;
 import org.openhab.binding.plugwiseha.internal.api.exception.PlugwiseHAInvalidHostException;
 import org.openhab.binding.plugwiseha.internal.api.exception.PlugwiseHANotAuthorizedException;
+import org.openhab.binding.plugwiseha.internal.api.exception.PlugwiseHATimeoutException;
 import org.openhab.binding.plugwiseha.internal.api.exception.PlugwiseHAUnauthorizedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,31 +74,34 @@ public class PlugwiseHAControllerRequest<T> {
     private static final String CONTENT_TYPE_TEXT_XML = MimeTypes.Type.TEXT_XML_8859_1.toString();
     private static final long TIMEOUT_SECONDS = 5;
 
-    private final XStream XStream;
+    private final Logger logger = LoggerFactory.getLogger(PlugwiseHAControllerRequest.class);
+    private final XStream xStream;
     private final HttpClient httpClient;
     private final String host;
     private final int port;
     private final Class<T> resultType;
+    private final @Nullable Transformer transformer;
 
     private Map<String, String> headers = new HashMap<>();
     private Map<String, String> queryParameters = new HashMap<>();
-    private @Nullable Object bodyParameter = null;
+    private @Nullable Object bodyParameter;
+    private @Nullable String serverDateTime;
     private String path = "/";
-
-    private final Logger logger = LoggerFactory.getLogger(PlugwiseHAControllerRequest.class);
 
     // Constructor
 
-    <X extends XStream> PlugwiseHAControllerRequest(Class<T> resultType, X XStream, HttpClient httpClient, String host,
-            int port, String username, String password) {
+    <X extends XStream> PlugwiseHAControllerRequest(Class<T> resultType, X xStream, @Nullable Transformer transformer,
+            HttpClient httpClient, String host, int port, String username, String password) {
         this.resultType = resultType;
-        this.XStream = XStream;
+        this.xStream = xStream;
+        this.transformer = transformer;
         this.httpClient = httpClient;
         this.host = host;
         this.port = port;
 
         setHeader(HttpHeader.ACCEPT.toString(), CONTENT_TYPE_TEXT_XML);
 
+        // Create Basic Auth header if username and password are supplied
         if (StringUtils.isNotBlank(username) && StringUtils.isNotBlank(password)) {
             setHeader(HttpHeader.AUTHORIZATION.toString(),
                     "Basic " + B64Code.encode(String.format("%s:%s", username, password), StringUtil.__ISO_8859_1));
@@ -99,10 +111,10 @@ public class PlugwiseHAControllerRequest<T> {
     // Public methods
 
     public void setPath(String path) {
-        this.setPath(path, null);
+        this.setPath(path, (HashMap<String, String>) null);
     }
 
-    public void setPath(String path, @Nullable HashMap<String, String> pathParameters) {
+    public void setPath(String path,  @Nullable HashMap<String, String> pathParameters) {
         this.path = path;
 
         if (pathParameters != null) {
@@ -114,8 +126,16 @@ public class PlugwiseHAControllerRequest<T> {
         this.headers.put(key, String.valueOf(value));
     }
 
+    public void addPathParameter(String key) {
+        this.path += String.format(";%s", key);
+    }
+
     public void addPathParameter(String key, Object value) {
         this.path += String.format(";%s=%s", key, value);
+    }
+
+    public void addPathFilter(String key, String operator, Object value) {
+        this.path += String.format(";%s:%s:%s", key, operator, value);
     }
 
     public void setQueryParameter(String key, Object value) {
@@ -126,22 +146,57 @@ public class PlugwiseHAControllerRequest<T> {
         this.bodyParameter = body;
     }
 
+    public @Nullable String getServerDateTime() {
+        return this.serverDateTime;
+    }
+
     @SuppressWarnings("unchecked")
-    public @Nullable T execute() throws PlugwiseHAException {
+    public T execute() throws PlugwiseHAException {
         T result = null;
         String xml = getContent();
-        // Only try and unmarshall non-void result types
-        if (!Void.class.equals(resultType)) {
-            result = (T) this.XStream.fromXML(xml);
+
+        if (String.class.equals(resultType)) {
+            if (this.transformer != null) {
+                result = (T) this.transformXML(xml);
+            } else {
+                result = (T) xml;
+            }
+        } else if (!Void.class.equals(resultType)) {
+            if (this.transformer != null) {
+                result = (T) this.xStream.fromXML(this.transformXML(xml));
+            } else {
+                result = (T) this.xStream.fromXML(xml);
+            }
         }
         return result;
     }
 
     // Protected and private methods
 
+    private String transformXML(String xml) throws PlugwiseHAException {
+        StringReader input = new StringReader(xml);
+        StringWriter output = new StringWriter();
+
+        try {
+            this.transformer.transform(new StreamSource(input), new StreamResult(output));
+        } catch (TransformerException e) {
+            throw new PlugwiseHAException("Could not apply XML stylesheet", e);
+        }
+
+        return output.toString();
+    }
+
     private String getContent() throws PlugwiseHAException {
         String content;
-        ContentResponse response = getContentResponse();
+        ContentResponse response;
+
+        try {
+            response = getContentResponse();
+        } catch (PlugwiseHATimeoutException e) {
+            // Retry
+            response = getContentResponse();
+        }
+        
         int status = response.getStatus();
         switch (status) {
         case HttpStatus.OK_200:
@@ -156,10 +211,13 @@ public class PlugwiseHAControllerRequest<T> {
         case HttpStatus.UNAUTHORIZED_401:
             throw new PlugwiseHAUnauthorizedException("Unauthorized");
         case HttpStatus.FORBIDDEN_403:
-            throw new PlugwiseHANotAuthorizedException("Forbidden");
+            throw new PlugwiseHAForbiddenException("Forbidden");
         default:
             throw new PlugwiseHAException("Unknown HTTP status code " + status + " returned by the controller");
         }
+
+        this.serverDateTime = response.getHeaders().get("Date");
+
         return content;
     }
 
@@ -174,16 +232,16 @@ public class PlugwiseHAControllerRequest<T> {
         try {
             response = request.send();
         } catch (TimeoutException | InterruptedException e) {
-            throw new PlugwiseHACommunicationException(e);
+            throw new PlugwiseHATimeoutException(e);
         } catch (ExecutionException e) {
             // Unwrap the cause and try to cleanly handle it
             Throwable cause = e.getCause();
             if (cause instanceof UnknownHostException) {
                 // Invalid hostname
-                throw new PlugwiseHAInvalidHostException(cause);
+                throw new PlugwiseHAException(cause);
             } else if (cause instanceof ConnectException) {
                 // Cannot connect
-                throw new PlugwiseHACommunicationException(cause);
+                throw new PlugwiseHAException(cause);
             } else {
                 // Catch all
                 throw new PlugwiseHAException(cause);
@@ -215,6 +273,6 @@ public class PlugwiseHAControllerRequest<T> {
     }
 
     private String getRequestBodyAsXml() {
-        return this.XStream.toXML(this.bodyParameter);
+        return this.xStream.toXML(this.bodyParameter);
     }
 }

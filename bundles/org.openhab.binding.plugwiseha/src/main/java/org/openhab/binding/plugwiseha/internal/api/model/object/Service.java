@@ -16,14 +16,14 @@ package org.openhab.binding.plugwiseha.internal.api.model.object;
 import com.thoughtworks.xstream.annotations.XStreamAlias;
 
 /**
- * The {@link Gateways} class is an object model class that
- * mirrors the XML structure provided by the Plugwise Home Automation
- * controller for the collection of gateways.
- * It extends the {@link CustomCollection} class.
- * 
  * @author B. van Wetten - Initial contribution
  */
-@XStreamAlias("gateways")
-public class Gateways extends CustomCollection<Gateway> {
+@XStreamAlias("service")
+public class Service extends PlugwiseBaseModel {
+   
+    @XStreamAlias("log_type")
+    private String logType;
 
+    @XStreamAlias("point_log")
+    private String pointLogId;
 }

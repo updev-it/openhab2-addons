@@ -13,23 +13,24 @@
 
 package org.openhab.binding.plugwiseha.internal.api.model.object;
 
+import java.time.ZonedDateTime;
+
 import com.thoughtworks.xstream.annotations.XStreamAlias;
-import com.thoughtworks.xstream.annotations.XStreamAsAttribute;
 
 /**
- * The {@link Gateway} class is an object model class that mirrors the XML
- * structure provided by the Plugwise Home Automation controller for a Plugwise
- * gateway.
- * 
  * @author B. van Wetten - Initial contribution
  */
 @XStreamAlias("gateway")
-public class Gateway {
-
-    @XStreamAsAttribute
-    private String id;
+public class GatewayInfo extends PlugwiseBaseModel {
 
     private String name;
+    private String description;
+    private String hostname;
+    private String timezone;
+    private ZonedDateTime time;
+
+    @XStreamAlias("gateway_environment")
+    private GatewayEnvironment gatewayEnvironment;
 
     @XStreamAlias("vendor_name")
     private String vendorName;
@@ -46,12 +47,40 @@ public class Gateway {
     @XStreamAlias("mac_address")
     private String macAddress;
 
-    public String getId() {
-        return this.id;
+    @XStreamAlias("lan_ip")
+    private String lanIp;
+
+    @XStreamAlias("wifi_ip")
+    private String wifiIp;
+
+    @XStreamAlias("last_reset_date")
+    private ZonedDateTime lastResetDate;
+
+    @XStreamAlias("last_boot_date")
+    private ZonedDateTime lastBootDate;
+
+    public ZonedDateTime getTime() {
+        return time;
     }
 
     public String getName() {
-        return this.name;
+        return name;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public String getHostname() {
+        return hostname;
+    }
+
+    public String getTimezone() {
+        return timezone;
+    }
+
+    public GatewayEnvironment getGatewayEnvironment() {
+        return gatewayEnvironment;
     }
 
     public String getVendorName() {
@@ -72,5 +101,21 @@ public class Gateway {
 
     public String getMacAddress() {
         return macAddress;
+    }
+
+    public String getLanIp() {
+        return lanIp;
+    }
+
+    public String getWifiIp() {
+        return wifiIp;
+    }
+
+    public ZonedDateTime getLastResetDate() {
+        return lastResetDate;
+    }
+
+    public ZonedDateTime getLastBootDate() {
+        return lastBootDate;
     }
 }

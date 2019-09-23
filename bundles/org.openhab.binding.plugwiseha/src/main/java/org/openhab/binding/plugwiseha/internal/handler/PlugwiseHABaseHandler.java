@@ -46,9 +46,9 @@ import org.slf4j.LoggerFactory;
  * @param <C> config - the Plugwise Home Automation config class used by this
  *            thing handler
  */
-public abstract class PlugwiseHABaseHandler<E, C> extends BaseThingHandler {
+public abstract class PlugwiseHABaseHandler<E, C extends PlugwiseHAThingConfig> extends BaseThingHandler {
 
-    private @Nullable PlugwiseHAThingConfig config;
+    // private @Nullable C config;
 
     protected final Logger logger = LoggerFactory.getLogger(PlugwiseHABaseHandler.class);
 
@@ -71,39 +71,29 @@ public abstract class PlugwiseHABaseHandler<E, C> extends BaseThingHandler {
     // Overrides
 
     @Override
-    @SuppressWarnings("unchecked")
-    public void initialize() {
-        this.config = getConfigAs(PlugwiseHAThingConfig.class);
+    public void initialize() {        
+        C config = getPlugwiseThingConfig();
 
-        if (this.checkConfig()) {
-            logger.debug("Initializing Plugwise Home Automation thing handler with config = {}", this.config);
+        if (checkConfig(config)) {
+            // logger.debug("Initializing Plugwise Home Automation thing handler with config = {}", config);
+
+            Bridge bridge = getBridge();
+            if (bridge == null || bridge.getHandler() == null
+                    || !(bridge.getHandler() instanceof PlugwiseHABridgeHandler)) {
+                updateStatus(OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
+                        "You must choose a Plugwise Home Automation bridge for this thing.");
+                return;
+            }
+    
+            if (bridge.getStatus() == OFFLINE) {
+                updateStatus(OFFLINE, ThingStatusDetail.BRIDGE_OFFLINE,
+                        "The Plugwise Home Automation bridge is currently offline.");
+            }
+    
+            initialize(config);
         } else {
-            logger.warn("Invalid config for Plugwise Home Automation thing handler with config = {}", this.config);
+            logger.warn("Invalid config for Plugwise Home Automation thing handler with config = {}", config);
         }
-
-        Bridge bridge = getBridge();
-        if (bridge == null || bridge.getHandler() == null
-                || !(bridge.getHandler() instanceof PlugwiseHABridgeHandler)) {
-            updateStatus(OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
-                    "You must choose a Plugwise Home Automation bridge for this thing.");
-            return;
-        }
-
-        if (bridge.getStatus() == OFFLINE) {
-            updateStatus(OFFLINE, ThingStatusDetail.BRIDGE_OFFLINE,
-                    "The Plugwise Home Automation bridge is currently offline.");
-        }
-
-        Class<?> clazz = (Class<?>) (((ParameterizedType) getClass().getGenericSuperclass())
-                .getActualTypeArguments()[1]);
-        C config = (C) getConfigAs(clazz);
-
-        initialize(config);
-    }
-
-    @Override
-    public void dispose() {
-        this.config = null;
     }
 
     @Override
@@ -115,16 +105,17 @@ public abstract class PlugwiseHABaseHandler<E, C> extends BaseThingHandler {
             if (controller != null) {
                 E entity = getEntity(controller);
                 if (entity != null) {
-                    if (command instanceof RefreshType) {
-                        refreshChannel(entity, channelUID);
-                    } else {
-                        if (this.isLinked(channelUID)) {
+                    if (this.isLinked(channelUID)) {
+                        if (command instanceof RefreshType) {
+                            refreshChannel(entity, channelUID);
+                        } else {
                             try {
                                 handleCommand(entity, channelUID, command);
                             } catch (PlugwiseHAException e) {
                                 logger.warn("Unexpected error handling command = {} for channel = {} : {}", command,
                                         channelUID, e.getMessage());
                             }
+
                         }
                     }
                 }
@@ -139,19 +130,16 @@ public abstract class PlugwiseHABaseHandler<E, C> extends BaseThingHandler {
         if (bridge != null) {
             return (PlugwiseHABridgeHandler) bridge.getHandler();
         }
-
+ 
         return null;
     }
 
-    public PlugwiseHAThingConfig getPlugwiseThingConfig() {
-        return this.config;
-    }
+    @SuppressWarnings("unchecked")
+    public C getPlugwiseThingConfig() {
+        Class<?> clazz = (Class<?>) (((ParameterizedType) getClass().getGenericSuperclass())
+                .getActualTypeArguments()[1]);
 
-    public String getId() {
-        if (this.config != null) {
-            return this.config.getId();
-        }
-        return null;
+        return (C) getConfigAs(clazz);
     }
 
     // Private & protected methods
@@ -168,8 +156,8 @@ public abstract class PlugwiseHABaseHandler<E, C> extends BaseThingHandler {
      * Checks the configuration for validity, result is reflected in the status of
      * the Thing
      */
-    private boolean checkConfig() {
-        if (this.config == null || !this.config.isValid()) {
+    private boolean checkConfig(C config) {
+        if (config == null || !config.isValid()) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
                     "Configuration is missing or corrupted");
             return false;

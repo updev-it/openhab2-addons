@@ -11,14 +11,19 @@
  * SPDX-License-Identifier: EPL-2.0
  */
 
+
 package org.openhab.binding.plugwiseha.internal.api.model.object;
 
+import com.thoughtworks.xstream.annotations.XStreamAlias;
+
 /**
- * The {@link LogType} interface describes common
- * methods that need to be implemented by any log type class.
- * 
  * @author B. van Wetten - Initial contribution
  */
-public interface LogType {
-    public String getType();
+@XStreamAlias("gateway_environment")
+public class GatewayEnvironment extends PlugwiseBaseModel {
+    private String city;
+    private String country;
+    private String currency;
+    private String latitude;
+    private String longitude;
 }

@@ -22,11 +22,11 @@
 				<label>Smile ID</label>
 				<description>The Smile ID is the 8 letter code on the sticker on the back of the Adam boiler gateway</description>
 			</parameter>
-            <parameter name="refresh" type="integer" min="10" max="120" required="true" unit="s">
+            <parameter name="refresh" type="integer" min="1" max="120" required="true" unit="s">
                 <label>Refresh interval</label>
 				<unitLabel>seconds</unitLabel>
                 <description>Refresh interval in seconds</description>
-                <default>15</default>
+                <default>5</default>
 				<advanced>true</advanced>
             </parameter>
 	</config-description>
@@ -67,6 +67,25 @@
 			<!-- <parameter name="name" type="text" required="true" readOnly="true">
 				<label>Name</label>
 				<description>Name of the central heating pump</description>
+			</parameter> -->
+	</config-description>
+
+	<!-- Appliance: Radiator valve -->
+	<config-description uri="thing-type:plugwiseha:appliance_thermostat">
+			<parameter name="id" type="text" required="true" readOnly="false">
+				<label>ID</label>
+				<description>Appliance ID</description>
+			</parameter>
+            <parameter name="lowBatteryPercentage" type="integer" min="1" max="50" required="true" unit="s">
+                <label>Low battery threshold</label>
+				<unitLabel>%</unitLabel>
+                <description>Battery charge remaining at which to trigger battery low warning</description>
+                <default>15</default>
+				<advanced>true</advanced>
+            </parameter>			
+			<!-- <parameter name="name" type="text" required="true" readOnly="true">
+				<label>Name</label>
+				<description>Name of the radiator valve</description>
 			</parameter> -->
 	</config-description>
 

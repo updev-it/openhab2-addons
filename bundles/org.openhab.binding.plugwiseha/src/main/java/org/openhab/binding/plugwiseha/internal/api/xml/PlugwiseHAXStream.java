@@ -20,20 +20,28 @@ import com.thoughtworks.xstream.XStream;
 import com.thoughtworks.xstream.io.xml.PrettyPrintWriter;
 import com.thoughtworks.xstream.io.xml.StaxDriver;
 import com.thoughtworks.xstream.io.xml.XmlFriendlyNameCoder;
+import com.thoughtworks.xstream.security.NoTypePermission;
+import com.thoughtworks.xstream.security.NullPermission;
 
-import org.openhab.binding.plugwiseha.internal.api.model.PlugwiseHAController;
-import org.openhab.binding.plugwiseha.internal.api.model.converter.ActuatorFunctionalitiesConverter;
-import org.openhab.binding.plugwiseha.internal.api.model.converter.AppliancesConverter;
-import org.openhab.binding.plugwiseha.internal.api.model.converter.GatewaysConverter;
-import org.openhab.binding.plugwiseha.internal.api.model.converter.LocationsConverter;
-import org.openhab.binding.plugwiseha.internal.api.model.converter.LogConverter;
-import org.openhab.binding.plugwiseha.internal.api.model.converter.LogsConverter;
-import org.openhab.binding.plugwiseha.internal.api.model.object.ActuatorFunctionalityOffset;
+import org.openhab.binding.plugwiseha.internal.api.model.converter.DateTimeConverter;
+import org.openhab.binding.plugwiseha.internal.api.model.object.ActuatorFunctionalities;
+import org.openhab.binding.plugwiseha.internal.api.model.object.ActuatorFunctionality;
 import org.openhab.binding.plugwiseha.internal.api.model.object.ActuatorFunctionalityRelay;
 import org.openhab.binding.plugwiseha.internal.api.model.object.ActuatorFunctionalityThermostat;
-import org.openhab.binding.plugwiseha.internal.api.model.object.Gateways;
+import org.openhab.binding.plugwiseha.internal.api.model.object.Appliance;
+import org.openhab.binding.plugwiseha.internal.api.model.object.Appliances;
+import org.openhab.binding.plugwiseha.internal.api.model.object.DomainObjects;
+import org.openhab.binding.plugwiseha.internal.api.model.object.GatewayEnvironment;
+import org.openhab.binding.plugwiseha.internal.api.model.object.GatewayInfo;
+import org.openhab.binding.plugwiseha.internal.api.model.object.Location;
 import org.openhab.binding.plugwiseha.internal.api.model.object.Locations;
-import org.openhab.binding.plugwiseha.internal.api.model.object.LogEntryPeriod;
+import org.openhab.binding.plugwiseha.internal.api.model.object.Log;
+import org.openhab.binding.plugwiseha.internal.api.model.object.Logs;
+import org.openhab.binding.plugwiseha.internal.api.model.object.Modules;
+import org.openhab.binding.plugwiseha.internal.api.model.object.Module;
+import org.openhab.binding.plugwiseha.internal.api.model.object.Services;
+import org.openhab.binding.plugwiseha.internal.api.model.object.Service;
+import org.openhab.binding.plugwiseha.internal.api.model.object.ZigBeeNode;
 
 /**
  * The {@link PlugwiseHAXStream} class is a utility class that wraps an XStream
@@ -45,73 +53,56 @@ import org.openhab.binding.plugwiseha.internal.api.model.object.LogEntryPeriod;
  */
 public class PlugwiseHAXStream extends XStream {
 
-    protected final PlugwiseHAController controller;
-
     private static XmlFriendlyNameCoder customCoder = new XmlFriendlyNameCoder("_-", "_");
 
-    public PlugwiseHAXStream(PlugwiseHAController controller) {
+    public PlugwiseHAXStream() {
         super(new StaxDriver(PlugwiseHAXStream.customCoder));
 
-        this.controller = controller;
         initialize();
     }
 
     // Protected methods
+
+    @SuppressWarnings("rawtypes")
+    protected void allowClass(Class clz) {
+        this.processAnnotations(clz);
+        this.allowTypeHierarchy(clz);
+    }
 
     protected void initialize() {
         // Configure XStream
         this.ignoreUnknownElements();
         this.setClassLoader(getClass().getClassLoader());
 
+        // Clear out existing
+        this.addPermission(NoTypePermission.NONE);
+        this.addPermission(NullPermission.NULL);
+
+        // Whitelist classes
+        this.allowClass(GatewayInfo.class);
+        this.allowClass(GatewayEnvironment.class);        
+        this.allowClass(Appliances.class);
+        this.allowClass(Appliance.class);
+        this.allowClass(Modules.class);
+        this.allowClass(Module.class);
+        this.allowClass(Locations.class);
+        this.allowClass(Location.class);
+        this.allowClass(Logs.class);
+        this.allowClass(Log.class);
+        this.allowClass(Services.class);
+        this.allowClass(Service.class);
+        this.allowClass(ZigBeeNode.class);
+        this.allowClass(ActuatorFunctionalities.class);
+        this.allowClass(ActuatorFunctionality.class);
+        this.allowClass(ActuatorFunctionalityThermostat.class);
+        this.allowClass(ActuatorFunctionalityRelay.class);
+        this.allowClass(DomainObjects.class);
+
         // Register custom converters
-        this.registerConverter(new LocationsConverter(this.getMapper(), "id", controller));
-        this.registerConverter(new AppliancesConverter(this.getMapper(), "id", controller));
-        this.registerConverter(new GatewaysConverter(this.getMapper(), "id"));
-        this.registerConverter(new ActuatorFunctionalitiesConverter(this.getMapper(), "id"));
-        this.registerConverter(new LogsConverter(this.getMapper()));
-        this.registerConverter(new LogConverter(this.getMapper()));
-
-        // Process annotationsLocations
-        this.processAnnotations(Locations.class);
-        this.processAnnotations(LogEntryPeriod.class);
-        this.processAnnotations(ActuatorFunctionalityThermostat.class);
-        this.processAnnotations(ActuatorFunctionalityRelay.class);
-        this.processAnnotations(ActuatorFunctionalityOffset.class);
-        this.processAnnotations(Gateways.class);
-
+        this.registerConverter(new DateTimeConverter());
     }
 
     // Public methods
-
-    public Object fromXML(String xml) {
-        return super.fromXML(xml);
-    }
-
-    @SuppressWarnings("rawtypes")
-    public Object fromXML(String xml, Class outClass) {
-        try {
-            Class.forName(outClass.getName());
-            super.processAnnotations(outClass);
-            return fromXML(xml);
-        } catch (ClassNotFoundException e) {
-            return null;
-        }
-    }
-
-    public String toXML(Object object) {
-        return super.toXML(object);
-    }
-
-    @SuppressWarnings("rawtypes")
-    public String toXML(Object object, Class outClass) {
-        try {
-            Class.forName(outClass.getName());
-            super.processAnnotations(outClass);
-            return toXML(object);
-        } catch (Exception e) {
-            return null;
-        }
-    }
 
     public void prettyPrint(Object object) {
         BufferedOutputStream stdout = new BufferedOutputStream(System.out);

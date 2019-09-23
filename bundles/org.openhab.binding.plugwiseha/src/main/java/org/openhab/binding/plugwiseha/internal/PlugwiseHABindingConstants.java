@@ -47,6 +47,7 @@ public class PlugwiseHABindingConstants {
         public static final ThingTypeUID THING_TYPE_ZONE = new ThingTypeUID(BINDING_ID, "zone");
         public static final ThingTypeUID THING_TYPE_APPLIANCE_VALVE = new ThingTypeUID(BINDING_ID, "appliance_valve");
         public static final ThingTypeUID THING_TYPE_APPLIANCE_PUMP = new ThingTypeUID(BINDING_ID, "appliance_pump");
+        public static final ThingTypeUID THING_TYPE_APPLIANCE_THERMOSTAT = new ThingTypeUID(BINDING_ID, "appliance_thermostat");
 
         // List of channel Type UIDs
         public static final ChannelTypeUID CHANNEL_TYPE_BATTERYLEVEL = new ChannelTypeUID("system:battery-level");
@@ -104,7 +105,7 @@ public class PlugwiseHABindingConstants {
                         .collect(Collectors.toSet());
 
         public static final Set<String> SUPPORTED_APPLIANCE_TYPES = Stream
-                        .of(APPLIANCE_TYPE_CENTRALHEATINGPUMP, APPLIANCE_TYPE_THERMOSTATICRADIATORVALUE)
+                        .of(APPLIANCE_TYPE_CENTRALHEATINGPUMP, APPLIANCE_TYPE_THERMOSTATICRADIATORVALUE, APPLIANCE_TYPE_ZONETHERMOSTAT)
                         .collect(Collectors.toSet());
 
         // Supported things

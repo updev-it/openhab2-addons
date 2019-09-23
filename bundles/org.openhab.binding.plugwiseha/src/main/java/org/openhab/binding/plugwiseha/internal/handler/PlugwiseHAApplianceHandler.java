@@ -37,6 +37,7 @@ import org.eclipse.smarthome.core.thing.Channel;
 import org.eclipse.smarthome.core.thing.ChannelUID;
 import org.eclipse.smarthome.core.thing.Thing;
 import org.eclipse.smarthome.core.thing.ThingTypeUID;
+import org.eclipse.smarthome.core.thing.binding.ThingHandler;
 import org.eclipse.smarthome.core.thing.binding.builder.ChannelBuilder;
 import org.eclipse.smarthome.core.thing.binding.builder.ThingBuilder;
 import org.eclipse.smarthome.core.thing.type.ChannelKind;
@@ -57,7 +58,7 @@ import org.slf4j.LoggerFactory;
  */
 public class PlugwiseHAApplianceHandler extends PlugwiseHABaseHandler<Appliance, PlugwiseHAThingConfig> {
 
-    private PlugwiseHAThingConfig config = new PlugwiseHAThingConfig();
+    // private PlugwiseHAThingConfig config = new PlugwiseHAThingConfig();
     private @Nullable Appliance appliance;
     private final Logger logger = LoggerFactory.getLogger(PlugwiseHAApplianceHandler.class);
 
@@ -69,7 +70,8 @@ public class PlugwiseHAApplianceHandler extends PlugwiseHABaseHandler<Appliance,
 
     public static boolean supportsThingType(ThingTypeUID thingTypeUID) {
         return PlugwiseHABindingConstants.THING_TYPE_APPLIANCE_VALVE.equals(thingTypeUID)
-                || PlugwiseHABindingConstants.THING_TYPE_APPLIANCE_PUMP.equals(thingTypeUID);
+                || PlugwiseHABindingConstants.THING_TYPE_APPLIANCE_PUMP.equals(thingTypeUID)
+                || PlugwiseHABindingConstants.THING_TYPE_APPLIANCE_THERMOSTAT.equals(thingTypeUID);
     }
 
     // Overrides
@@ -83,21 +85,41 @@ public class PlugwiseHAApplianceHandler extends PlugwiseHABaseHandler<Appliance,
                         "Invalid configuration for Plugwise Home Automation appliance handler.");
                 return;
             }
-            this.config = config;
+            // this.config = config;
             this.appliance = getEntity(this.getPlugwiseHABridge().getController());
-
-            setApplianceProperties();
-            updateStatus(ONLINE);
 
             if (this.appliance.isBatteryOperated()) {
                 addBatteryChannels();
+            }
+
+            setApplianceProperties();
+            updateStatus(ONLINE);
+        }
+    }
+
+    @Override
+    public void thingUpdated(Thing thing) {
+        super.thingUpdated(thing);
+
+        if (this.appliance.isBatteryOperated()) {
+            addBatteryChannels();
+        }
+
+        ThingHandler thingHandler = thing.getHandler();
+
+        if (thingHandler != null) {
+            for (Channel channel : thing.getChannels()) {
+                if (this.isLinked(channel.getUID())) {
+                    this.refreshChannel(this.appliance, channel.getUID());
+                }
             }
         }
     }
 
     @Override
     protected @Nullable Appliance getEntity(PlugwiseHAController controller) {
-        Appliance appliance = controller.getAppliance(this.getId());
+        PlugwiseHAThingConfig config = getPlugwiseThingConfig();
+        Appliance appliance = controller.getAppliance(config.getId());
 
         return appliance;
     }
@@ -110,30 +132,58 @@ public class PlugwiseHAApplianceHandler extends PlugwiseHABaseHandler<Appliance,
         case APPLIANCE_SETPOINT_CHANNEL:
             if (command instanceof QuantityType) {
                 QuantityType<Temperature> state = (QuantityType<Temperature>) command;
-                entity.setThermostatTemperature(state.doubleValue());
-                updateState(APPLIANCE_SETPOINT_CHANNEL, (State) command);
+
+                Optional.ofNullable(this.getPlugwiseHABridge()).ifPresent(bridge -> {
+                    Optional.ofNullable(bridge.getController()).ifPresent(controller -> {
+                        try {
+                            controller.setThermostat(entity, state.doubleValue());
+                            updateState(APPLIANCE_SETPOINT_CHANNEL, (State) command);
+                        } catch (PlugwiseHAException e) {
+                            logger.warn("Unable to update setpoint for appliance '{}': {} -> {}", entity.getName(),
+                                    entity.getSetpointTemperature().orElse(null), state.doubleValue());
+                        }
+                    });
+                });
             }
             break;
         case APPLIANCE_POWER_CHANNEL:
             if (command instanceof OnOffType) {
                 OnOffType state = (OnOffType) command;
-                if (state == OnOffType.ON) {
-                    entity.switchOn();
-                } else {
-                    entity.switchOff();
-                }
-                updateState(APPLIANCE_POWER_CHANNEL, (State) command);
+
+                Optional.ofNullable(this.getPlugwiseHABridge()).ifPresent(bridge -> {
+                    Optional.ofNullable(bridge.getController()).ifPresent(controller -> {
+                        try {
+                            if (state == OnOffType.ON) {
+                                controller.switchRelayOn(entity);
+                            } else {
+                                controller.switchRelayOff(entity);
+                            }
+                            updateState(APPLIANCE_SETPOINT_CHANNEL, (State) command);
+                        } catch (PlugwiseHAException e) {
+                            logger.warn("Unable to switch relay {} for appliance '{}'", state, entity.getName());
+                        }
+                    });
+                });
             }
             break;
         case APPLIANCE_LOCK_CHANNEL:
             if (command instanceof OnOffType) {
                 OnOffType state = (OnOffType) command;
-                if (state == OnOffType.ON) {
-                    entity.switchLockOn();
-                } else {
-                    entity.switchLockOff();
-                }
-                updateState(APPLIANCE_LOCK_CHANNEL, (State) command);
+
+                Optional.ofNullable(this.getPlugwiseHABridge()).ifPresent(bridge -> {
+                    Optional.ofNullable(bridge.getController()).ifPresent(controller -> {
+                        try {
+                            if (state == OnOffType.ON) {
+                                controller.switchRelayLockOn(entity);
+                            } else {
+                                controller.switchRelayLockOff(entity);
+                            }
+                            updateState(APPLIANCE_LOCK_CHANNEL, (State) command);
+                        } catch (PlugwiseHAException e) {
+                            logger.warn("Unable to switch relay lock {} for appliance '{}'", state, entity.getName());
+                        }
+                    });
+                });
             }
             break;
         default:
@@ -163,84 +213,91 @@ public class PlugwiseHAApplianceHandler extends PlugwiseHABaseHandler<Appliance,
     protected void refreshChannel(Appliance entity, ChannelUID channelUID) {
         String channelID = channelUID.getIdWithoutGroup();
         State state = getDefaultState(channelID);
+        PlugwiseHAThingConfig config = getPlugwiseThingConfig();
 
-        switch (channelID) {
-        case APPLIANCE_SETPOINT_CHANNEL:
-            if (entity.getThermostatTemperature().isPresent()) {
-                state = new DecimalType(entity.getThermostatTemperature().get());
-            }
-            break;
-        case APPLIANCE_TEMPERATURE_CHANNEL:
-            if (entity.getTemperature().isPresent()) {
-                state = new DecimalType(entity.getTemperature().get());
-            }
-            break;
-        case APPLIANCE_BATTERYLEVEL_CHANNEL: {
-            Optional<Double> batteryLevelOptional = entity.getBatteryLevel();
-            Double batteryLevel = batteryLevelOptional.isPresent() ? batteryLevelOptional.get() * 100 : null;
+        // TODO Fetch appliance from API to force refresh - use synchronized block to
+        // prevent multiple threads from calling
 
-            if (batteryLevelOptional.isPresent()) {
-                state = new DecimalType(batteryLevel.intValue());
-                if (batteryLevel <= this.config.getLowBatteryPercentage()) {
-                    updateState(APPLIANCE_BATTERYLEVELLOW_CHANNEL, OnOffType.ON);                    
-                } else {
-                    updateState(APPLIANCE_BATTERYLEVELLOW_CHANNEL, OnOffType.OFF);
+        try {
+            switch (channelID) {
+            case APPLIANCE_SETPOINT_CHANNEL:
+                if (entity.getSetpointTemperature().isPresent()) {
+                    state = new DecimalType(entity.getSetpointTemperature().get());
                 }
-            }
-            break;
-        }
-        case APPLIANCE_BATTERYLEVELLOW_CHANNEL: {
-            Optional<Double> batteryLevelOptional = entity.getBatteryLevel();
-            Double batteryLevel = batteryLevelOptional.isPresent() ? batteryLevelOptional.get() * 100 : null;
-
-            if (batteryLevelOptional.isPresent()) {
-                if (batteryLevel <= this.config.getLowBatteryPercentage()) {
-                    state = OnOffType.ON;
-                } else {
-                    state = OnOffType.OFF;
+                break;
+            case APPLIANCE_TEMPERATURE_CHANNEL:
+                if (entity.getTemperature().isPresent()) {
+                    state = new DecimalType(entity.getTemperature().get());
                 }
-            }
-            break;
-        }
-        case APPLIANCE_POWER_USAGE_CHANNEL: {
-            if (entity.getPowerUsage().isPresent()) {
-                state = new DecimalType(entity.getPowerUsage().get());
-            }
-            break;
-        }
-        case APPLIANCE_POWER_CHANNEL: {
-            Optional<String> relayStateOptional = entity.getRelayState();
-            String relayState = relayStateOptional.isPresent() ? relayStateOptional.get() : null;
+                break;
+            case APPLIANCE_BATTERYLEVEL_CHANNEL: {
+                Optional<Double> batteryLevelOptional = entity.getBatteryLevel();
+                Double batteryLevel = batteryLevelOptional.isPresent() ? batteryLevelOptional.get() * 100 : null;
 
-            if (relayStateOptional.isPresent()) {
-                switch (relayState.toLowerCase()) {
-                case "on":
-                    state = OnOffType.ON;
-                    break;
-                case "off":
-                    state = OnOffType.OFF;
-                    break;
-                default:
-                    break;
+                if (batteryLevelOptional.isPresent()) {
+                    state = new DecimalType(batteryLevel.intValue());
+                    if (batteryLevel <= config.getLowBatteryPercentage()) {
+                        updateState(APPLIANCE_BATTERYLEVELLOW_CHANNEL, OnOffType.ON);
+                    } else {
+                        updateState(APPLIANCE_BATTERYLEVELLOW_CHANNEL, OnOffType.OFF);
+                    }
                 }
+                break;
             }
-            break;
-        }
-        case APPLIANCE_LOCK_CHANNEL: {
-            Optional<Boolean> relayLockStateOptional = entity.getRelayLockState();
-            boolean relayLockState = relayLockStateOptional.isPresent() ? relayLockStateOptional.get() : null;
+            case APPLIANCE_BATTERYLEVELLOW_CHANNEL: {
+                Double batteryLevel = entity.getBatteryLevel().orElse(null);
 
-            if (relayLockStateOptional.isPresent()) {
-                if (relayLockState == true) {
-                    state = OnOffType.ON;
-                } else {
-                    state = OnOffType.OFF;
+                if (batteryLevel != null) {
+                    batteryLevel *= 100;
+                    if (batteryLevel <= config.getLowBatteryPercentage()) {
+                        state = OnOffType.ON;
+                    } else {
+                        state = OnOffType.OFF;
+                    }
                 }
+                break;
             }
-            break;
-        }
-        default:
-            break;
+            case APPLIANCE_POWER_USAGE_CHANNEL: {
+                if (entity.getPowerUsage().isPresent()) {
+                    state = new DecimalType(entity.getPowerUsage().get());
+                }
+                break;
+            }
+            case APPLIANCE_POWER_CHANNEL: {
+                String relayState = entity.getRelayState().orElse(null);
+
+                if (relayState != null) {
+                    switch (relayState.toLowerCase()) {
+                    case "on":
+                        state = OnOffType.ON;
+                        break;
+                    case "off":
+                        state = OnOffType.OFF;
+                        break;
+                    default:
+                        break;
+                    }
+                }
+                break;
+            }
+            case APPLIANCE_LOCK_CHANNEL: {
+                Boolean relayLockState = entity.getRelayLockState().orElse(null);
+
+                if (relayLockState != null) {
+                    if (relayLockState) {
+                        state = OnOffType.ON;
+                    } else {
+                        state = OnOffType.OFF;
+                    }
+                }
+                break;
+            }
+            default:
+                break;
+            }
+        } catch (NullPointerException e) {
+            e.toString();
+            throw e;
         }
 
         if (state != UnDefType.NULL && state != UnDefType.UNDEF) {

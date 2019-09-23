@@ -42,11 +42,12 @@ import org.openhab.binding.plugwiseha.internal.api.exception.PlugwiseHACommunica
 import org.openhab.binding.plugwiseha.internal.api.exception.PlugwiseHAException;
 import org.openhab.binding.plugwiseha.internal.api.exception.PlugwiseHAInvalidHostException;
 import org.openhab.binding.plugwiseha.internal.api.exception.PlugwiseHANotAuthorizedException;
+import org.openhab.binding.plugwiseha.internal.api.exception.PlugwiseHATimeoutException;
 import org.openhab.binding.plugwiseha.internal.api.exception.PlugwiseHAUnauthorizedException;
 import org.openhab.binding.plugwiseha.internal.api.model.PlugwiseHAController;
 import org.openhab.binding.plugwiseha.internal.api.model.object.Appliance;
-import org.openhab.binding.plugwiseha.internal.api.model.object.Gateway;
-import org.openhab.binding.plugwiseha.internal.api.model.object.PlugwiseHAModel;
+import org.openhab.binding.plugwiseha.internal.api.model.object.GatewayInfo;
+import org.openhab.binding.plugwiseha.internal.api.model.PlugwiseHAModel;
 import org.openhab.binding.plugwiseha.internal.config.PlugwiseHABridgeThingConfig;
 import org.openhab.binding.plugwiseha.internal.config.PlugwiseHAThingConfig;
 import org.slf4j.Logger;
@@ -66,6 +67,7 @@ public class PlugwiseHABridgeHandler extends BaseBridgeHandler {
     // Private Static error messages
 
     private static final String STATUS_DESCRIPTION_COMMUNICATION_ERROR = "Error communicating with the Plugwise Home Automation controller";
+    private static final String STATUS_DESCRIPTION_TIMEOUT = "Communication timeout while communicating with the Plugwise Home Automation controller";
     private static final String STATUS_DESCRIPTION_CONFIGURATION_ERROR = "Invalid or missing configuration";
     private static final String STATUS_DESCRIPTION_INVALID_CREDENTIALS = "Invalid username and/or password - please double-check your configuration";
     private static final String STATUS_DESCRIPTION_INVALID_HOSTNAME = "Invalid hostname - please double-check your configuration";
@@ -73,7 +75,7 @@ public class PlugwiseHABridgeHandler extends BaseBridgeHandler {
     // Private member variables/constants
 
     private PlugwiseHABridgeThingConfig config;
-    private Gateway gateway;
+    private GatewayInfo gatewayInfo;
     private ScheduledFuture<?> refreshJob;
     private volatile PlugwiseHAController controller;
 
@@ -97,13 +99,13 @@ public class PlugwiseHABridgeHandler extends BaseBridgeHandler {
 
         if (this.checkConfig()) {
             logger.debug("Initializing the Plugwise Home Automation bridge handler with config = {}", this.config);
-            try {                
+            try {
                 this.controller = new PlugwiseHAController(httpClient, config.getHost(), config.getPort(),
                         config.getUsername(), config.getsmileId());
                 this.controller.start(() -> {
                     setBridgeProperties();
-                    updateStatus(ONLINE); }
-                    );
+                    updateStatus(ONLINE);
+                });
             } catch (PlugwiseHAInvalidHostException e) {
                 updateStatus(OFFLINE, CONFIGURATION_ERROR, STATUS_DESCRIPTION_INVALID_HOSTNAME);
             } catch (PlugwiseHAUnauthorizedException | PlugwiseHANotAuthorizedException e) {
@@ -130,11 +132,7 @@ public class PlugwiseHABridgeHandler extends BaseBridgeHandler {
     public void dispose() {
         cancelRefreshJob();
         if (this.controller != null) {
-            try {
-                this.controller.stop();
-            } catch (PlugwiseHAException e) {
-                // Don't do anything - we are disposing
-            }
+            this.controller.stop();
             this.controller = null;
         }
     }
@@ -155,7 +153,7 @@ public class PlugwiseHABridgeHandler extends BaseBridgeHandler {
 
     // Getters & setters
 
-    public @Nullable PlugwiseHAController getController() {
+    public synchronized @Nullable PlugwiseHAController getController() {
         return this.controller;
     }
 
@@ -197,6 +195,8 @@ public class PlugwiseHABridgeHandler extends BaseBridgeHandler {
             updateStatus(OFFLINE, CONFIGURATION_ERROR, STATUS_DESCRIPTION_INVALID_CREDENTIALS);
         } catch (PlugwiseHACommunicationException e) {
             updateStatus(OFFLINE, COMMUNICATION_ERROR, STATUS_DESCRIPTION_COMMUNICATION_ERROR);
+        } catch (PlugwiseHATimeoutException e) {
+            updateStatus(OFFLINE, COMMUNICATION_ERROR, STATUS_DESCRIPTION_TIMEOUT);
         } catch (Exception e) {
             logger.warn("Unhandled exception while refreshing the Plugwise Home Automation Controller {} - {}",
                     getThing().getUID(), e.getMessage());
@@ -206,9 +206,10 @@ public class PlugwiseHABridgeHandler extends BaseBridgeHandler {
 
     @SuppressWarnings("unchecked")
     private void refresh() throws PlugwiseHAException {
-        if (this.controller != null) {
+        if (this.getController() != null) {
             logger.debug("Refreshing the Plugwise Home Automation Controller {}", getThing().getUID());
-            this.controller.refresh();
+            this.config = getConfig().as(PlugwiseHABridgeThingConfig.class);
+            this.getController().refresh();
 
             getThing().getThings().forEach((thing) -> {
                 ThingHandler thingHandler = thing.getHandler();
@@ -246,14 +247,18 @@ public class PlugwiseHABridgeHandler extends BaseBridgeHandler {
     }
 
     protected void setBridgeProperties() {
-        this.gateway = this.controller.getGateway();
+        try {
+            this.gatewayInfo = this.getController().getGatewayInfo();
 
-        Map<String, String> properties = editProperties();
-        properties.put(Thing.PROPERTY_FIRMWARE_VERSION, this.gateway.getFirmwareVersion());
-        properties.put(Thing.PROPERTY_HARDWARE_VERSION, this.gateway.getHardwareVersion());
-        properties.put(Thing.PROPERTY_MAC_ADDRESS, this.gateway.getMacAddress());
-        properties.put(Thing.PROPERTY_VENDOR, this.gateway.getVendorName());
-        properties.put(Thing.PROPERTY_MODEL_ID, this.gateway.getVendorModel());
-        updateProperties(properties);
+            Map<String, String> properties = editProperties();
+            properties.put(Thing.PROPERTY_FIRMWARE_VERSION, this.gatewayInfo.getFirmwareVersion());
+            properties.put(Thing.PROPERTY_HARDWARE_VERSION, this.gatewayInfo.getHardwareVersion());
+            properties.put(Thing.PROPERTY_MAC_ADDRESS, this.gatewayInfo.getMacAddress());
+            properties.put(Thing.PROPERTY_VENDOR, this.gatewayInfo.getVendorName());
+            properties.put(Thing.PROPERTY_MODEL_ID, this.gatewayInfo.getVendorModel());
+            updateProperties(properties);
+        } catch (PlugwiseHAException e) {
+            updateStatus(OFFLINE, COMMUNICATION_ERROR, STATUS_DESCRIPTION_COMMUNICATION_ERROR);
+        }
     }
 }

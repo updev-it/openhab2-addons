@@ -13,17 +13,35 @@
 
 package org.openhab.binding.plugwiseha.internal.api.model.object;
 
-import com.thoughtworks.xstream.annotations.XStreamAlias;
+import java.util.Map;
 
 /**
- * The {@link Appliances} class is an object model class that
- * mirrors the XML structure provided by the Plugwise Home Automation
- * controller for the collection of appliances.
- * It extends the {@link CustomCollection} class.
+ * The {@link Appliances} class is an object model class that mirrors the XML
+ * structure provided by the Plugwise Home Automation controller for the
+ * collection of appliances. It extends the {@link PlugwiseHACollection} class.
  * 
  * @author B. van Wetten - Initial contribution
  */
-@XStreamAlias("appliances")
-public class Appliances extends CustomCollection<Appliance> {
+public class Appliances extends PlugwiseHACollection<Appliance> {
 
+    @Override
+    public void merge(Map<String, Appliance> appliances) {
+        if (appliances != null) {
+            for (Appliance updatedAppliance : appliances.values()) {
+                String id = updatedAppliance.getId();
+                Appliance originalAppliance = this.get(id);
+
+                if (originalAppliance != null && originalAppliance.isOlderThan(updatedAppliance)) {
+                    Logs updatedPointLogs = updatedAppliance.getPointLogs();
+                    ActuatorFunctionalities updatedActuatorFunctionalities = updatedAppliance
+                            .getActuatorFunctionalities();
+                    
+                    updatedPointLogs.merge(originalAppliance.getPointLogs());
+                    updatedActuatorFunctionalities.merge(originalAppliance.getActuatorFunctionalities());
+
+                    this.put(id, updatedAppliance);
+                }
+            }
+        }
+    }
 }

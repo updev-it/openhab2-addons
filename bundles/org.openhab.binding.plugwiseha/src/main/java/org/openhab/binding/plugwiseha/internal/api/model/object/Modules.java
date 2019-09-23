@@ -13,13 +13,20 @@
 
 package org.openhab.binding.plugwiseha.internal.api.model.object;
 
+import java.util.Map;
+
 /**
- * The {@link ActuatorFunctionalityType} interface describes common
- * methods that need to be implemented by any actuator functionality class.
+ * The {@link Modules} class is an object model class that
+ * mirrors the XML structure provided by the Plugwise Home Automation
+ * controller for the collection of modules.
+ * It extends the {@link PlugwiseHACollection} class.
  * 
  * @author B. van Wetten - Initial contribution
  */
-public interface ActuatorFunctionalityType {
-    public String getId();
-    public String getType();
+public class Modules extends PlugwiseHACollection<Module> {
+    
+    @Override
+    public void merge(Map<String, Module> modules) {
+
+    }
 }

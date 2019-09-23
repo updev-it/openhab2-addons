@@ -16,168 +16,115 @@ package org.openhab.binding.plugwiseha.internal.api.model.object;
 import java.util.Optional;
 
 import com.thoughtworks.xstream.annotations.XStreamAlias;
-import com.thoughtworks.xstream.annotations.XStreamAsAttribute;
-
-import org.openhab.binding.plugwiseha.internal.api.exception.PlugwiseHAException;
-import org.openhab.binding.plugwiseha.internal.api.model.PlugwiseHAController;
+import com.thoughtworks.xstream.annotations.XStreamImplicit;
 
 /**
  * The {@link Appliance} class is an object model class that
  * mirrors the XML structure provided by the Plugwise Home Automation
  * controller for a Plugwise appliance.
- * It implements the {@link PlugwiseHAModel} interface.
+ * It implements the {@link PlugwiseComparableDate} interface and 
+ * extends the abstract class {@link PlugwiseBaseModel}.
  * 
  * @author B. van Wetten - Initial contribution
  */
 @XStreamAlias("appliance")
-public class Appliance implements PlugwiseHAModel {
-
-    @XStreamAsAttribute
-    private String id;
+public class Appliance extends PlugwiseBaseModel implements PlugwiseComparableDate<Appliance> {
 
     private String name;
-
     private String description;
-
     private String type;
+    private String location;
 
-    private Logs logs;
+    @XStreamAlias("zig_bee_node")
+    private ZigBeeNode zigbeeNode;
 
-    @XStreamAlias("actuator_functionalities")
+    @XStreamImplicit(itemFieldName = "point_log", keyFieldName = "type")
+    private Logs pointLogs;
+
+    @XStreamImplicit(itemFieldName = "actuator_functionality", keyFieldName = "type")
     private ActuatorFunctionalities actuatorFunctionalities;
 
-    @XStreamAlias("created_date")
-    private String createdDate;
-
-    @XStreamAlias("modified_date")
-    private String modifiedDate;
-
-    @XStreamAlias("deleted_date")
-    private String deletedDate;
-
-    // Non-serializable fields
-
-    private transient PlugwiseHAController controller;
-
-    public Appliance(PlugwiseHAController controller) {
-        this.controller = controller;
-    }
-
-    public String getId() {
-        return this.id;
-    }
-
     public String getName() {
-        return this.name;
-    }
-
-    public String getType() {
-        return this.type;
+        return name;
     }
 
     public String getDescription() {
-        return this.description;
+        return description;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public String getLocation() {
+        return location;
+    }
+
+    public ZigBeeNode getZigbeeNode() {
+        if (zigbeeNode == null) {
+            zigbeeNode = new ZigBeeNode();
+        }
+        return zigbeeNode;
+    }
+
+    public Logs getPointLogs() {
+        if (pointLogs == null) {
+            pointLogs = new Logs();
+        }
+        return pointLogs;
     }
 
     public ActuatorFunctionalities getActuatorFunctionalities() {
-        return this.actuatorFunctionalities;
+        if (actuatorFunctionalities == null) {
+            actuatorFunctionalities = new ActuatorFunctionalities();
+        }
+        return actuatorFunctionalities;
     }
 
-    public PlugwiseHAController getController() {
-        return controller;
+    public Optional<Double> getTemperature() {
+        return this.pointLogs.getTemperature();
     }
 
-    public void setController(PlugwiseHAController controller) {
-        this.controller = controller;
-    }
-
-    public Optional<Double> getTemperature() {                
-        return this.logs.getTemperature();
-    }
-
-    public Optional<Double> getThermostatTemperature() {                
-        return this.logs.getThermostatTemperature();
-    }
-
-    public Optional<Double> getBatteryLevel() {
-        return this.logs.getBatteryLevel();
+    public Optional<Double> getSetpointTemperature() {
+        return this.pointLogs.getThermostatTemperature();
     }
 
     public Optional<String> getRelayState() {
-        return this.logs.getRelayState();     
-    }
-
-    public Optional<Double> getPowerUsage() {
-        return this.logs.getPowerUsage();
+        return this.pointLogs.getRelayState();
     }
 
     public Optional<Boolean> getRelayLockState() {
-        ActuatorFunctionalityRelay relay = (ActuatorFunctionalityRelay) this.actuatorFunctionalities.get("relay");
-        return Optional.ofNullable(relay.getLockState());
+        return this.actuatorFunctionalities.getRelayLockState();
     }
 
+    public Optional<Double> getBatteryLevel() {
+        return this.pointLogs.getBatteryLevel();
+    }
+
+    public Optional<Double> getPowerUsage() {
+        return this.pointLogs.getPowerUsage();
+    }
 
     public boolean isBatteryOperated() {
-        return this.getBatteryLevel().isPresent();
+        if (this.zigbeeNode instanceof ZigBeeNode) {
+            return this.zigbeeNode.getPowerSource().equals("battery") && this.getBatteryLevel().isPresent();
+        } else {
+            return false;
+        }        
     }
 
-    public void setThermostatTemperature(Double temperature) throws PlugwiseHAException {
-        ActuatorFunctionalityThermostat thermostat = (ActuatorFunctionalityThermostat) this.actuatorFunctionalities.get("thermostat");
-
-        if (thermostat != null && this.controller != null) {
-            try {
-                this.controller.setThermostatTemperature(temperature, this, thermostat);
-            } catch (Exception e) {
-                e.toString();
-            }            
-        }
+    @Override
+    public int compareDateWith(Appliance hasModifiedDate) {
+        return this.getModifiedDate().compareTo(hasModifiedDate.getModifiedDate());
     }
 
-    public void switchOff() {
-        ActuatorFunctionalityRelay relay = (ActuatorFunctionalityRelay) this.actuatorFunctionalities.get("relay");
-
-        if (relay != null && this.controller != null) {
-            try {
-                this.controller.switchRelay(this, "off");
-            } catch (Exception e) {
-                e.toString();
-            }            
-        }
+    @Override
+    public boolean isNewerThan(Appliance hasModifiedDate) {
+        return compareDateWith(hasModifiedDate) > 0;
     }
 
-    public void switchOn() {
-        ActuatorFunctionalityRelay relay = (ActuatorFunctionalityRelay) this.actuatorFunctionalities.get("relay");
-
-        if (relay != null && this.controller != null) {
-            try {
-                this.controller.switchRelay(this, "on");
-            } catch (Exception e) {
-                e.toString();
-            }            
-        }
-    }
-
-    public void switchLockOff() {
-        ActuatorFunctionalityRelay relay = (ActuatorFunctionalityRelay) this.actuatorFunctionalities.get("relay");
-
-        if (relay != null && this.controller != null) {
-            try {
-                this.controller.switchRelayLock(this, "off");
-            } catch (Exception e) {
-                e.toString();
-            }            
-        }
-    }
-
-    public void switchLockOn() {
-        ActuatorFunctionalityRelay relay = (ActuatorFunctionalityRelay) this.actuatorFunctionalities.get("relay");
-
-        if (relay != null && this.controller != null) {
-            try {
-                this.controller.switchRelayLock(this, "on");
-            } catch (Exception e) {
-                e.toString();
-            }            
-        }
+    @Override
+    public boolean isOlderThan(Appliance hasModifiedDate) {
+        return compareDateWith(hasModifiedDate) < 0;
     }
 }

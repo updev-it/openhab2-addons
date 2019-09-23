@@ -13,17 +13,40 @@
 
 package org.openhab.binding.plugwiseha.internal.api.model.object;
 
-import com.thoughtworks.xstream.annotations.XStreamAlias;
+import java.util.Map;
 
 /**
- * The {@link Locations} class is an object model class that
- * mirrors the XML structure provided by the Plugwise Home Automation
- * controller for the collection of Plugwise locations/zones.
- * It extends the {@link CustomCollection} class.
+ * The {@link Locations} class is an object model class that mirrors the XML
+ * structure provided by the Plugwise Home Automation controller for the
+ * collection of Plugwise locations/zones. It extends the
+ * {@link PlugwiseHACollection} class.
  * 
  * @author B. van Wetten - Initial contribution
  */
-@XStreamAlias("locations")
-public class Locations extends CustomCollection<Location> {
+public class Locations extends PlugwiseHACollection<Location> {
 
+    @Override
+    public void merge(Map<String, Location> locations) {
+        if (locations != null) {
+            for (Location updatedLocation : locations.values()) {
+                String id = updatedLocation.getId();
+                Location originalLocation = this.get(id);
+
+                try {
+                    if (originalLocation != null && originalLocation.isOlderThan(updatedLocation)) {
+                        Logs updatedPointLogs = updatedLocation.getPointLogs();
+                        ActuatorFunctionalities updatedActuatorFunctionalities = updatedLocation
+                                .getActuatorFunctionalities();
+
+                        updatedPointLogs.merge(originalLocation.getPointLogs());
+                        updatedActuatorFunctionalities.merge(originalLocation.getActuatorFunctionalities());
+
+                        this.put(id, updatedLocation);
+                    }
+                } catch (NullPointerException e) {
+                    e.toString();
+                }
+            }
+        }
+    }
 }

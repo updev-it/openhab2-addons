@@ -13,21 +13,13 @@
 
 package org.openhab.binding.plugwiseha.internal.api.model.object;
 
-import com.thoughtworks.xstream.annotations.XStreamAlias;
-
 /**
- * The {@link LogEntry} class is an extendible class to be used by XStream to
- * serialize Plugwise 'point_log' entries to and from XML. It implements the
- * {@link LogType} interface
- * 
  * @author B. van Wetten - Initial contribution
  */
-@XStreamAlias("point_log")
-public class LogEntry implements LogType {
+public interface PlugwiseComparableDate<T extends PlugwiseBaseModel> {
+    public int compareDateWith(T hasModifiedDate);
 
-    private String type;
+    public boolean isOlderThan(T hasModifiedDate);
 
-    public String getType() {
-        return this.type;
-    }
+    public boolean isNewerThan(T hasModifiedDate);
 }

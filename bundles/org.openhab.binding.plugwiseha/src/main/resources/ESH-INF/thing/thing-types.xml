@@ -31,7 +31,7 @@
 		<config-description-ref uri="thing-type:plugwiseha:zone" /> 
 	</thing-type>
 
-	<!-- Appliance: Radiator valve -->
+	<!-- Appliance: Radiator valve (Tom) -->
 	<thing-type id="appliance_valve" listed="true">
 		<supported-bridge-type-refs>
 			<bridge-type-ref id="gateway" />
@@ -50,7 +50,7 @@
 		<config-description-ref uri="thing-type:plugwiseha:appliance_valve" /> 
 	</thing-type>
 
-	<!-- Appliance: Pump switch -->
+	<!-- Appliance: Pump switch (Circle) -->
 	<thing-type id="appliance_pump" listed="true">
 		<supported-bridge-type-refs>
 			<bridge-type-ref id="gateway" />
@@ -68,6 +68,25 @@
 		<representation-property>id</representation-property>
 
 		<config-description-ref uri="thing-type:plugwiseha:appliance_pump" /> 
+	</thing-type>
+
+	<!-- Appliance: Zone thermostat (Lisa) -->
+	<thing-type id="appliance_thermostat" listed="true">
+		<supported-bridge-type-refs>
+			<bridge-type-ref id="gateway" />
+		</supported-bridge-type-refs>
+
+		<label>Plugwise room thermostat</label>
+		<description>A Plugwise Home Automation room thermostat</description>
+
+		<channels>
+			<channel id="setpointTemperature" typeId="setpointTemperature" />
+			<channel id="temperature" typeId="temperature" />
+		</channels>
+
+		<representation-property>id</representation-property>
+
+		<config-description-ref uri="thing-type:plugwiseha:appliance_thermostat" /> 
 	</thing-type>
 
 </thing:thing-descriptions>

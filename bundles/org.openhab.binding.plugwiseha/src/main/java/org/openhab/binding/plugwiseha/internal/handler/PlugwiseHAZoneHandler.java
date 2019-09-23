@@ -54,7 +54,7 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings("unused")
 public class PlugwiseHAZoneHandler extends PlugwiseHABaseHandler<Location, PlugwiseHAThingConfig> {
 
-    private PlugwiseHAThingConfig config = new PlugwiseHAThingConfig();
+    // private PlugwiseHAThingConfig config = new PlugwiseHAThingConfig();
     private @Nullable Location location;
     private final Logger logger = LoggerFactory.getLogger(PlugwiseHAZoneHandler.class);
 
@@ -79,12 +79,10 @@ public class PlugwiseHAZoneHandler extends PlugwiseHABaseHandler<Location, Plugw
                         "Invalid configuration for Plugwise Home Automation zone handler.");
                 return;
             }
-            Optional<PlugwiseHABridgeHandler> bridge = Optional.ofNullable(this.getPlugwiseHABridge());
-            bridge.ifPresent(_bridge -> {
-                Optional<PlugwiseHAController> controller = Optional.ofNullable(_bridge.getController());
-                controller.ifPresent(_controller -> {
-                    this.config = config;
-                    this.location = getEntity(_controller);
+
+            Optional.ofNullable(this.getPlugwiseHABridge()).ifPresent(bridge -> {
+                Optional.ofNullable(bridge.getController()).ifPresent(controller -> {
+                    this.location = getEntity(controller);
 
                     setLocationProperties();
                     updateStatus(ONLINE);
@@ -95,7 +93,8 @@ public class PlugwiseHAZoneHandler extends PlugwiseHABaseHandler<Location, Plugw
 
     @Override
     protected @Nullable Location getEntity(PlugwiseHAController controller) {
-        Location location = controller.getLocation(this.getId());
+        PlugwiseHAThingConfig config = getPlugwiseThingConfig();
+        Location location = controller.getLocation(config.getId());
 
         return location;
     }
@@ -108,8 +107,18 @@ public class PlugwiseHAZoneHandler extends PlugwiseHABaseHandler<Location, Plugw
         case ZONE_SETPOINT_CHANNEL:
             if (command instanceof QuantityType) {
                 QuantityType<Temperature> state = (QuantityType<Temperature>) command;
-                entity.setThermostatTemperature(state.doubleValue());
-                updateState(ZONE_SETPOINT_CHANNEL, (State) command);
+
+                Optional.ofNullable(this.getPlugwiseHABridge()).ifPresent(bridge -> {
+                    Optional.ofNullable(bridge.getController()).ifPresent(controller -> {
+                        try {
+                            controller.setLocationThermostat(entity, state.doubleValue());
+                            updateState(ZONE_SETPOINT_CHANNEL, (State) command);
+                        } catch (PlugwiseHAException e) {
+                            logger.warn("Unable to update setpoint for zone '{}': {} -> {}", entity.getName(),
+                                    entity.getSetpointTemperature().orElse(null), state.doubleValue());
+                        }
+                    });
+                });
             }
             break;
         default:
@@ -133,10 +142,12 @@ public class PlugwiseHAZoneHandler extends PlugwiseHABaseHandler<Location, Plugw
         String channelID = channelUID.getIdWithoutGroup();
         State state = getDefaultState(channelID);
 
+        // TODO Fetch location from API to force refresh - use synchronized block to prevent multiple threads from calling
+
         switch (channelID) {
         case ZONE_SETPOINT_CHANNEL:
-            if (entity.getThermostatTemperature().isPresent()) {
-                state = new DecimalType(entity.getThermostatTemperature().get());
+            if (entity.getSetpointTemperature().isPresent()) {
+                state = new DecimalType(entity.getSetpointTemperature().get());
             }
             break;
         case ZONE_TEMPERATURE_CHANNEL:
@@ -157,11 +168,8 @@ public class PlugwiseHAZoneHandler extends PlugwiseHABaseHandler<Location, Plugw
         if (this.location != null) {
             Map<String, String> properties = editProperties();
 
-            Optional<ActuatorFunctionalities> actuatorFunctionalities = Optional
-                    .ofNullable(this.location.getActuatorFunctionalities());
-
-            actuatorFunctionalities.ifPresent(_actuatorFunctionalities -> {
-                properties.put("functionalities", _actuatorFunctionalities.keySet().stream().map(e -> e.toString())
+            Optional.ofNullable(this.location.getActuatorFunctionalities()).ifPresent(actuatorFunctionalities -> {
+                properties.put("functionalities", actuatorFunctionalities.keySet().stream().map(e -> e.toString())
                         .collect(Collectors.joining(", ")));
 
             });

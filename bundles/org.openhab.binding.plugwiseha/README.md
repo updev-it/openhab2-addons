@@ -17,7 +17,7 @@ The binding requires users to have a working Plugwise Home Automation setup cons
 | [Tom](https://www.plugwise.com/en_US/products/tom)       | A Plugwise Home Automation radiator valve                                                                          | appliance_valve |
 | [Floor](https://www.plugwise.com/en_US/products/floor)   | A Plugwise Home Automation radiator valve specificaly used for floor heating                                       | appliance_valve |
 | [Circle](https://www.plugwise.com/en_US/products/circle) | A power outlet plug that provides energy measurement and switching control of appliances (e.g. floor heating pump) | appliance_pump  |
-| [Lisa](https://www.plugwise.com/en_US/products/lisa)     | A room thermostat                                                                                                  | thermostat      |
+| [Lisa](https://www.plugwise.com/en_US/products/lisa)     | A room thermostat (also supports the 'Anna' room thermostat)                                                       | appliance_thermostat |
 
 
 ## Discovery
@@ -50,6 +50,14 @@ You must define a Plugwise Home Automation gateway (Bridge) before defining zone
 | id                   | The unique ID of the radiator valve appliance                                                                      | Required | -       |
 | lowBatteryPercentage | Battery charge remaining at which to trigger battery low warning. (*Only applicable for battery operated devices*) | Optional | 15      |
 
+#### Plugwise Home Automation appliance (`appliance_thermostat`):
+
+| Parameter            | Description                                                                                                        | Config   | Default |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------ | -------- | ------- |
+| id                   | The unique ID of the room thermostat appliance                                                                     | Required | -       |
+| lowBatteryPercentage | Battery charge remaining at which to trigger battery low warning. (*Only applicable for battery operated devices*) | Optional | 15      |
+
+
 #### Plugwise Home Automation appliance (`appliance_pump`):
 
 | Parameter | Description                         | Config   | Default |
@@ -76,6 +84,7 @@ You must define a Plugwise Home Automation gateway (Bridge) before defining zone
 Bridge plugwiseha:gateway:home "Plugwise Home Automation Gateway" [ smileId="abcdefgh" ] {
 	Thing zone living_room_zone "Living room" [ id="$device_id" ]
     Thing appliance_valve living_room_radiator "Living room radiator valve" [ id="$device_id" ]
+	Thing appliance_thermostat living_room_thermostat "Living room thermostat" [ id="$device_id" ]
     Thing appliance_pump living_room_pump "Floor heating pump" [ id="$device_id" ]
 }
 ```
@@ -90,6 +99,9 @@ Number living_room_zone_temperature_setpoint "Zone temperature setpoint" {channe
 
 Number living_room_radiator_temperature "Radiator valve temperature" {channel="plugwiseha:appliance_valve:home:living_room_radiator:temperature"}
 Number living_room_radiator_temperature_setpoint "Radiator valve temperature setpoint" {channel="plugwiseha:appliance_valve:home:living_room_radiator:setpointTemperature"}
+
+Number living_room_thermostat_temperature "Room thermostat temperature" {channel="plugwiseha:appliance_valve:home:living_room_thermostat:temperature"}
+Number living_room_thermostat_temperature_setpoint "Room thermostat temperature setpoint" {channel="plugwiseha:appliance_valve:home:living_room_thermostat:setpointTemperature"}
 
 Switch living_room_pump_power "Floor heating pump power" {channel="plugwiseha:appliance_pump:home:living_room_pump:power"}
 Switch living_room_pump_lock "Floor heating pump lock [MAP:(plugwiseha.map):%s]" {channel="plugwiseha:appliance_pump:home:living_room_pump:lock"}
@@ -111,6 +123,12 @@ sitemap plugwiseha label="PlugwiseHA Binding"
 	Frame {
         Text item=living_room_zone_temperature
         Setpoint item=living_room_zone_temperature_setpoint label="Living room [%.1f °C]" minValue=5.0 maxValue=25 step=0.5
+
+		Text item=living_room_radiator_temperature
+        Setpoint item=living_room_radiator_temperature_setpoint label="Living room [%.1f °C]" minValue=5.0 maxValue=25 step=0.5
+
+		Text item=living_room_thermostat_temperature
+        Setpoint item=living_room_thermostat_temperature_setpoint label="Living room [%.1f °C]" minValue=5.0 maxValue=25 step=0.5
 
 		Number item=living_room_pump_power_usage
 		Switch item=living_room_pump_power

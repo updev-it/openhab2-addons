@@ -13,29 +13,20 @@
 
 package org.openhab.binding.plugwiseha.internal.api.model.object;
 
-import java.util.Optional;
+import java.util.Map;
 
 /**
- * The {@link LogRelay} class is an object model class that
+ * The {@link Services} class is an object model class that
  * mirrors the XML structure provided by the Plugwise Home Automation
- * controller for a specific log entry type. ('relay')
- * It implements the {@link LogType} interface.
+ * controller for the collection of module services.
+ * It extends the {@link PlugwiseHACollection} class.
  * 
  * @author B. van Wetten - Initial contribution
  */
-public class LogRelay implements LogType {
+public class Services extends PlugwiseHACollection<Service> {
 
-    private String type;
-    
-    private LogEntryPeriod period;
+    @Override
+    public void merge(Map<String, Service> services) {
 
-    public String getType() {
-        return this.type;
-    }
-
-    public Optional<String> getRelayState() {
-        String relayState = this.period.getMeasurement().map(measurement -> measurement).orElse(null);
-        return Optional.ofNullable(relayState);
     }
 }
-

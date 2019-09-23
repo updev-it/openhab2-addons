@@ -13,121 +13,98 @@
 
 package org.openhab.binding.plugwiseha.internal.api.model.object;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import com.thoughtworks.xstream.annotations.XStreamAlias;
-import com.thoughtworks.xstream.annotations.XStreamAsAttribute;
-
-import org.eclipse.jdt.annotation.NonNullByDefault;
-import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.binding.plugwiseha.internal.api.exception.PlugwiseHAException;
-import org.openhab.binding.plugwiseha.internal.api.model.PlugwiseHAController;
+import com.thoughtworks.xstream.annotations.XStreamImplicit;
 
 /**
- * The {@link Location} class is an object model class that mirrors the XML
- * structure provided by the Plugwise Home Automation controller for a Plugwise
- * location/zone. It implements the {@link PlugwiseHAModel} interface.
+ * The {@link Location} class is an object model class that
+ * mirrors the XML structure provided by the Plugwise Home Automation
+ * controller for a Plugwise zone/location.
+ * It implements the {@link PlugwiseComparableDate} interface and 
+ * extends the abstract class {@link PlugwiseBaseModel}.
  * 
  * @author B. van Wetten - Initial contribution
  */
 @XStreamAlias("location")
-@NonNullByDefault
-public class Location implements PlugwiseHAModel {
+public class Location extends PlugwiseBaseModel implements PlugwiseComparableDate<Location> {
 
-    @XStreamAsAttribute
-    private @Nullable String id;
+    private String name;
+    private String description;
+    private String type;
+    private String preset;
 
-    private @Nullable String name;
+    @XStreamImplicit(itemFieldName = "appliance")
+    private List<String> locationAppliances = new ArrayList<String>();
 
-    private @Nullable String type;
+    @XStreamImplicit(itemFieldName = "point_log", keyFieldName = "type")
+    private Logs pointLogs;
 
-    private @Nullable String description;
+    @XStreamImplicit(itemFieldName = "actuator_functionality", keyFieldName = "type")
+    private ActuatorFunctionalities actuatorFunctionalities;
 
-    private @Nullable Appliances appliances;
-
-    private @Nullable Logs logs;
-
-    // Non-serializable fields
-
-    private transient PlugwiseHAController controller;
-
-    @XStreamAlias("actuator_functionalities")
-    private @Nullable ActuatorFunctionalities actuatorFunctionalities;
-
-    public Location(PlugwiseHAController controller) {
-        this.controller = controller;
+    public String getName() {
+        return name;
     }
 
-    public @Nullable String getId() {
-        return this.id;
+    public String getDescription() {
+        return description;
     }
 
-    public @Nullable String getName() {
-        return this.name;
+    public String getType() {
+        return type;
     }
 
-    public @Nullable String getType() {
-        return this.type;
+    public String getPreset() {
+        return preset;
     }
 
-    public @Nullable String getDescription() {
-        return this.description;
+    public List<String> getLocationAppliances() {
+        return locationAppliances;
     }
 
-    public @Nullable ActuatorFunctionalities getActuatorFunctionalities() {
-        return this.actuatorFunctionalities;
+    public Logs getPointLogs() {
+        if (pointLogs == null) {
+            pointLogs = new Logs();
+        }
+        return pointLogs;
     }
 
-    public PlugwiseHAController getController() {
-        return controller;
+    public ActuatorFunctionalities getActuatorFunctionalities() {
+        if (actuatorFunctionalities == null) {
+            actuatorFunctionalities = new ActuatorFunctionalities();
+        }
+        return actuatorFunctionalities;
     }
 
-    public void setController(PlugwiseHAController controller) {
-        this.controller = controller;
+    public Optional<Double> getTemperature() {
+        return this.pointLogs.getTemperature();
     }
 
-    @SuppressWarnings("null")
+    public Optional<Double> getSetpointTemperature() {
+        return this.pointLogs.getThermostatTemperature();
+    }
+
     public int applianceCount() {
-        if (this.appliances == null) {
+        if (this.locationAppliances == null) {
             return 0;
         } else {
-            return this.appliances.size();
+            return this.locationAppliances.size();
         }
     }
 
-    @SuppressWarnings("null")
-    public Optional<Double> getTemperature() {
-        if (this.logs == null) {
-            return Optional.empty();
-        } else {
-            return this.logs.getTemperature();
-        }
+    public int compareDateWith(Location hasModifiedDate) {
+        return this.getModifiedDate().compareTo(hasModifiedDate.getModifiedDate());
     }
 
-    @SuppressWarnings("null")
-    public Optional<Double> getThermostatTemperature() {
-        if (this.logs == null) {
-            return Optional.empty();
-        } else {
-            return this.logs.getThermostatTemperature();
-        }
+    public boolean isOlderThan(Location hasModifiedDate) {
+        return compareDateWith(hasModifiedDate) < 0;
     }
 
-    public boolean isBatteryOperated() {
-        return false;
-    }
-
-    @SuppressWarnings("null")
-    public void setThermostatTemperature(Double temperature) throws PlugwiseHAException {
-        if (this.actuatorFunctionalities != null) {
-            ActuatorFunctionalityThermostat thermostat = (ActuatorFunctionalityThermostat) this.actuatorFunctionalities
-                    .get("thermostat");
-
-            if (thermostat != null) {
-                this.controller.setThermostatTemperature(temperature, this, thermostat);
-            }
-        } else {
-            throw new PlugwiseHAException(String.format("Location %s has no thermostat functionality: unable to change ThermostatTemperature", this.getName()));
-        }
+    public boolean isNewerThan(Location hasModifiedDate) {
+        return this.compareDateWith(hasModifiedDate) > 0;
     }
 }

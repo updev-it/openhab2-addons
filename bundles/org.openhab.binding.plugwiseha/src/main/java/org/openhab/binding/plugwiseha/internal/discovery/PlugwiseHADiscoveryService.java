@@ -29,6 +29,7 @@ import org.openhab.binding.plugwiseha.internal.api.exception.PlugwiseHAException
 import org.openhab.binding.plugwiseha.internal.api.model.PlugwiseHAController;
 import org.openhab.binding.plugwiseha.internal.api.model.object.Appliance;
 import org.openhab.binding.plugwiseha.internal.api.model.object.Appliances;
+import org.openhab.binding.plugwiseha.internal.api.model.object.DomainObjects;
 import org.openhab.binding.plugwiseha.internal.api.model.object.Location;
 import org.openhab.binding.plugwiseha.internal.api.model.object.Locations;
 import org.openhab.binding.plugwiseha.internal.handler.PlugwiseHABridgeHandler;
@@ -57,10 +58,9 @@ public class PlugwiseHADiscoveryService extends AbstractDiscoveryService {
     }
 
     @Override
-    protected void startScan() {
+    protected synchronized void startScan() {
         try {
-            discoverLocations();
-            discoverAppliances();
+            discoverDomainObjects();
         } catch (PlugwiseHAException e) {
             // Ignore silently
         }
@@ -111,13 +111,13 @@ public class PlugwiseHADiscoveryService extends AbstractDiscoveryService {
     // }
     // }
 
-    private void discoverLocations() throws PlugwiseHAException {
+    private void discoverDomainObjects() throws PlugwiseHAException {
         PlugwiseHAController controller = this.handler.getController();
 
         if (controller != null) {
-            Locations locations = controller.getLocations();
+            DomainObjects domainObjects = controller.getDomainObjects();            
 
-            for (Location location : locations.values()) {
+            for (Location location : domainObjects.getLocations().values()) {
                 // Only add locations with at least 1 appliance (this ignores the 'root' (home)
                 // location which is the parent of all other locations.)
                 if (location.applianceCount() > 0) {
@@ -125,21 +125,13 @@ public class PlugwiseHADiscoveryService extends AbstractDiscoveryService {
                 }
             }
 
-        }
-    }
-
-    private void discoverAppliances() throws PlugwiseHAException {
-        PlugwiseHAController controller = this.handler.getController();
-
-        if (controller != null) {
-            Appliances appliances = controller.getAppliances();
-
-            for (Appliance appliance : appliances.values()) {
+            for (Appliance appliance : domainObjects.getAppliances().values()) {
                 // Only add appliances that are required/supported for this binding
                 if (PlugwiseHABindingConstants.SUPPORTED_APPLIANCE_TYPES.contains(appliance.getType())) {
                     applianceDiscovery(appliance);
                 }
             }
+
         }
     }
 
@@ -161,6 +153,10 @@ public class PlugwiseHADiscoveryService extends AbstractDiscoveryService {
             break;
         case "central_heating_pump":
             uid = new ThingUID(PlugwiseHABindingConstants.THING_TYPE_APPLIANCE_PUMP, bridgeUID, applianceId);
+            break;
+        case "zone_thermostat":
+            uid = new ThingUID(PlugwiseHABindingConstants.THING_TYPE_APPLIANCE_THERMOSTAT, bridgeUID, applianceId);
+            configProperties.put(APPLIANCE_CONFIG_LOWBATTERY, 15);
             break;
         default:
             return;

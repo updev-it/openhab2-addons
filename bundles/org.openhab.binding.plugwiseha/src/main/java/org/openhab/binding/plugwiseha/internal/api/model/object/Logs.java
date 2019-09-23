@@ -13,64 +13,80 @@
 
 package org.openhab.binding.plugwiseha.internal.api.model.object;
 
+import java.util.Map;
 import java.util.Optional;
-
-import com.thoughtworks.xstream.annotations.XStreamAlias;
 
 /**
  * The {@link Logs} class is an object model class that
  * mirrors the XML structure provided by the Plugwise Home Automation
  * controller for the collection of logs.
- * It extends the {@link CustomCollection} class.
+ * It extends the {@link PlugwiseHACollection} class.
  * 
  * @author B. van Wetten - Initial contribution
  */
-@XStreamAlias("logs")
-public class Logs extends CustomCollection<LogType> {
+public class Logs extends PlugwiseHACollection<Log> {
 
-    private static String LOG_TEMPERATURE = "temperature";
-    private static String LOG_THERMOSTAT = "thermostat";
-    private static String LOG_BATTERY = "battery";
-    private static String LOG_RELAY = "relay";
-    private static String LOG_POWERUSAGE = "electricity_consumed";
-
-    public Optional<LogTemperature> getLogTemperature() {
-        return Optional.ofNullable((LogTemperature) this.get(Logs.LOG_TEMPERATURE));
-    }
-
-    public Optional<LogTemperature> getLogThermostat() {
-        return Optional.ofNullable((LogTemperature) this.get(Logs.LOG_THERMOSTAT));
-    }
-
-    public Optional<LogBattery> getLogBattery() {
-        return Optional.ofNullable((LogBattery) this.get(Logs.LOG_BATTERY));
-    }
-
-    public Optional<LogRelay> getLogRelay() {
-        return Optional.ofNullable((LogRelay) this.get(Logs.LOG_RELAY));
-    }
-
-    public Optional<LogPowerUsage> getLogPowerUsage() {
-        return Optional.ofNullable((LogPowerUsage) this.get(Logs.LOG_POWERUSAGE));
-    }
+    private final String THERMOSTAT = "thermostat";
+    private final String TEMPERATURE = "temperature";
+    private final String BATTERY = "battery";
+    private final String POWER_USAGE = "electricity_consumed";
+    private final String RELAY = "relay";
 
     public Optional<Double> getTemperature() {
-        return this.getLogTemperature().map(logTemperature -> logTemperature.getTemperature()).orElse(Optional.empty());
+        return this.getLogTemperature().map(logEntry -> logEntry.getMeasurementAsDouble()).orElse(Optional.empty());
     }
 
     public Optional<Double> getThermostatTemperature() {
-        return this.getLogThermostat().map(logTemperature -> logTemperature.getTemperature()).orElse(Optional.empty());
-    }
-
-    public Optional<Double> getBatteryLevel() {
-        return this.getLogBattery().map(logBattery -> logBattery.getBatteryLevel()).orElse(Optional.empty());
+        return this.getLogThermostat().map(logEntry -> logEntry.getMeasurementAsDouble()).orElse(Optional.empty());
     }
 
     public Optional<String> getRelayState() {
-        return this.getLogRelay().map(logRelay -> logRelay.getRelayState()).orElse(Optional.empty());
+        return this.getLogRelay().map(logEntry -> logEntry.getMeasurement()).orElse(Optional.empty());
+    }
+
+    public Optional<Double> getBatteryLevel() {
+        return this.getLogBattery().map(logEntry -> logEntry.getMeasurementAsDouble()).orElse(Optional.empty());
     }
 
     public Optional<Double> getPowerUsage() {
-        return this.getLogPowerUsage().map(logPowerUsage -> logPowerUsage.getPowerUsage()).orElse(Optional.empty());
+        return this.getLogPowerUsage().map(logEntry -> logEntry.getMeasurementAsDouble()).orElse(Optional.empty());
+    }
+
+    public Optional<Log> getLogThermostat() {
+        return Optional.ofNullable(this.get(THERMOSTAT));
+    }
+
+    public Optional<Log> getLogTemperature() {
+        return Optional.ofNullable(this.get(TEMPERATURE));
+    }
+
+    public Optional<Log> getLogRelay() {
+        return Optional.ofNullable(this.get(RELAY));
+    }
+
+    public Optional<Log> getLogBattery() {
+        return Optional.ofNullable(this.get(BATTERY));
+    }
+
+    public Optional<Log> getLogPowerUsage() {
+        return Optional.ofNullable(this.get(POWER_USAGE));
+    }
+
+    @Override
+    public void merge(Map<String, Log> logs) {
+        if (logs != null) {
+            for (Log log : logs.values()) {
+                String type = log.getType();
+                Log updatedLog = this.get(type);
+
+                try {
+                    if (updatedLog == null || updatedLog.isOlderThan(log)) {
+                        this.put(type, log);
+                    }   
+                } catch (NullPointerException e) {
+                    e.toString();
+                }          
+            }
+        }
     }
 }
